@@ -29,6 +29,7 @@ pragma solidity ^0.8.28;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/automation/AutomationCompatible.sol";
 
 // import {VRFCoordinatorV2Interface} from "chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 // import {VRFConsumerBaseV2} from "chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
@@ -39,7 +40,7 @@ import {VRFV2PlusClient} from "@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusCl
  * @notice This contract is used for a Raffle (Lottery Smart Contract) System
  * @dev It implements Chainlink VRFv2.5 for random number generation and Chainlink Automation
  */
-contract Raffle is VRFConsumerBaseV2Plus {
+contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     //contract Raffle is VRFConsumerBaseV2 {
     /** Custom Errors */
     /*** Custom Errors related to Raffle Contracts */
@@ -47,8 +48,14 @@ contract Raffle is VRFConsumerBaseV2Plus {
     error Raffle__IntervalNotPassed();
     error Raffle__PrizeTransferFailed();
     error Raffle__RaffleNotOpen();
-    /*** Custom Errors related to VRF */
+    /*** Custom Errors related to Chainlink VRF */
     //error VRF__RequestNotFound();
+    /*** Custom Errors related to Chainlink Automation */
+    error Automation__UpkeepNotNeeded(
+        uint256 contractBalance,
+        uint256 numberOfPlayers,
+        uint256 raffleState
+    );
 
     /** Type Declarations */
     /*** Enum */
@@ -122,65 +129,26 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
     /*** external Functions: Start */
 
-    // 1. Get a random winner
-    // 2. Use a random number to pick a winner from players
-    // 3. Automatically called
-    function pickWinner() external RaffleIsOpen {
-        /**** Checks */
-        // Check to see if enough time has passed
-        if (block.timestamp - s_lastTimeStamp < i_interval)
-            revert Raffle__IntervalNotPassed();
-
-        /**** Effects **
-        // Set the state to CALCULATING
-        s_raffleState = RaffleState.CALCULATING;
-
-        /**** Interactions (External contract interactions)  */
-        // Request random number from Chainlink VRF
-        VRFV2PlusClient.RandomWordsRequest memory randomWordsRequestData = VRFV2PlusClient
-            .RandomWordsRequest({
-                keyHash: i_gasLane,
-                subId: i_subscriptionId,
-                requestConfirmations: REQUEST_CONFIRMATIONS,
-                callbackGasLimit: i_callbackGasLimit,
-                numWords: NUM_WORDS,
-                extraArgs: VRFV2PlusClient._argsToBytes(
-                    // Set nativePayment to false to use LINK, true to use native (Sepolia ETH)
-                    VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
-                )
-            });
-
-        uint256 requestId = s_vrfCoordinator.requestRandomWords(
-            randomWordsRequestData
-        );
-        emit WinnerPickRequestSent(requestId);
-
-        //s_requests[requestId] = RequestStatus({
-        //    randomWords: new uint256[](0),
-        //    exists: true,
-        //    fulfilled: false
-        //});
-        //requestIds.push(requestId);
-        //lastRequestId = requestId;
-        //emit RequestSent(requestId, NUM_WORDS);
-
-        //VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-        //bytes32 private immutable i_gasLane;
-        //uint256 private immutable i_subscriptionId;
-        //uint16 private constant REQUEST_CONFIRMATIONS = 3;
-        //uint32 private immutable i_callbackGasLimit;
-        //uint32 private constant NUM_WORDS = 1;
-
-        //uint256 requestId = i_vrfCoordinator.requestRandomWords(
-        //    i_gasLane,
-        //    i_subscriptionId,
-        //    REQUEST_CONFIRMATIONS,
-        //    i_callbackGasLimit,
-        //    NUM_WORDS
-        //);
+    /**
+     * @dev performUpKeep do these steps
+     * 1. Get a random number
+     * 2. Use the random number to pick a player
+     * 3. Automatically called
+     */
+    function performUpkeep(bytes calldata /* performData */) external override {
+        (bool upkeepNeeded, ) = checkUpkeep(bytes(""));
+        if (!upkeepNeeded) {
+            revert Automation__UpkeepNotNeeded(
+                address(this).balance,
+                s_players.length,
+                uint256(s_raffleState)
+            );
+        }
+        // Do "pickWinner"
+        pickWinner();
     }
 
-    /*
+    /**
     // @dev getRequestStatus function
     function getRequestStatus(
         uint256 _requestId
@@ -214,12 +182,45 @@ contract Raffle is VRFConsumerBaseV2Plus {
         emit EnteredRaffle(msg.sender);
     }
 
+    /**
+     * @dev This is the function that the Chainlink Automation nodes call
+     * They look for 'upkeepNeeded' to return true.
+     * The following should be true for this to return true:
+     *     1. The time interval has passed between raffle runs
+     *     2. The lottery is open (Not calculating)
+     *     3. The contract has ETH
+     *     4. There are players registered
+     *     5. Implicitly, you subscription is funded with LINK
+     * _param - ignore
+     * @return upkeepNeeded - true if it's time to pick a winner and restart the lottery
+     * _return - ignore
+     */
+    function checkUpkeep(
+        bytes memory /* checkData */
+    )
+        public
+        view
+        override
+        returns (bool upkeepNeeded, bytes memory /* performData */)
+    {
+        bool isIntervalPassed = (block.timestamp - s_lastTimeStamp) >=
+            i_interval;
+        bool isRaffleOpen = RaffleState.OPEN == s_raffleState;
+        bool contractHasBalance = address(this).balance > 0;
+        bool contractHasPlayers = s_players.length > 0;
+        upkeepNeeded = (isIntervalPassed &&
+            isRaffleOpen &&
+            contractHasBalance &&
+            contractHasPlayers);
+        return (upkeepNeeded, "0x0");
+    }
+
     /*** public Functions: End */
 
     /*** internal Functions: Start */
     // @dev fulfillRandomWords function
     function fulfillRandomWords(
-        uint256 _requestId,
+        uint256 /* _requestId */,
         //    uint256[] memory randomWords
         uint256[] calldata _randomWords
     ) internal override {
@@ -257,6 +258,39 @@ contract Raffle is VRFConsumerBaseV2Plus {
         (bool success, ) = s_lastWinner.call{value: address(this).balance}("");
         //require(success, "Prize transfer failed");
         if (!success) revert Raffle__PrizeTransferFailed();
+    }
+
+    // 1. Get a random winner
+    // 2. Use a random number to pick a winner from players
+    // 3. Automatically called
+    // @dev Do not need to check "RaffleIsOpen" because parent contract already checks
+    function pickWinner() internal {
+        /**** Checks */
+        // Do not need to check if enough time has passed because parent contract already checks
+
+        /**** Effects */
+        // Set the state to CALCULATING
+        s_raffleState = RaffleState.CALCULATING;
+
+        /**** Interactions (External contract interactions) */
+        // Request random number from Chainlink VRF
+        VRFV2PlusClient.RandomWordsRequest memory randomWordsRequestData = VRFV2PlusClient
+            .RandomWordsRequest({
+                keyHash: i_gasLane,
+                subId: i_subscriptionId,
+                requestConfirmations: REQUEST_CONFIRMATIONS,
+                callbackGasLimit: i_callbackGasLimit,
+                numWords: NUM_WORDS,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    // Set nativePayment to false to use LINK, true to use native (Sepolia ETH)
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+                )
+            });
+
+        uint256 requestId = s_vrfCoordinator.requestRandomWords(
+            randomWordsRequestData
+        );
+        emit WinnerPickRequestSent(requestId);
     }
 
     /*** internal Functions: End */
