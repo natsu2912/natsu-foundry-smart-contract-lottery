@@ -22,3 +22,6 @@ Makefile
 
 # lib
 lib/
+
+# VSCode
+.vscode/
