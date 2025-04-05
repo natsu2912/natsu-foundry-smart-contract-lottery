@@ -31,9 +31,6 @@ import {VRFConsumerBaseV2Plus} from "@chainlink/src/v0.8/vrf/dev/VRFConsumerBase
 import {VRFV2PlusClient} from "@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/automation/AutomationCompatible.sol";
 
-// import {VRFCoordinatorV2Interface} from "chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
-// import {VRFConsumerBaseV2} from "chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-
 /**
  * @title This is the Raffle contract
  * @author natsu
@@ -41,17 +38,18 @@ import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/automation/Auto
  * @dev It implements Chainlink VRFv2.5 for random number generation and Chainlink Automation
  */
 contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
-    //contract Raffle is VRFConsumerBaseV2 {
     /** Custom Errors */
     /*** Custom Errors related to Raffle Contracts */
-    error Raffle__SendMoreEthToEnterRaffle();
+    error Raffle__NotEnoughEthSent(uint256 sentValue, uint256 minValue);
     error Raffle__IntervalNotPassed();
     error Raffle__PrizeTransferFailed();
     error Raffle__RaffleNotOpen();
     /*** Custom Errors related to Chainlink VRF */
-    //error VRF__RequestNotFound();
+    //...
+
     /*** Custom Errors related to Chainlink Automation */
     error Automation__UpkeepNotNeeded(
+        bool isIntervalPassed,
         uint256 contractBalance,
         uint256 numberOfPlayers,
         uint256 raffleState
@@ -81,21 +79,10 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     uint64 private immutable i_subscriptionId;
     uint32 private immutable i_callbackGasLimit;
     uint32 private constant NUM_WORDS = 1;
-    struct RequestStatus {
-        bool fulfilled; // whether the request has been successfully fulfilled
-        bool exists; // whether a requestId exists
-        uint256[] randomWords;
-    }
-    mapping(uint256 => RequestStatus)
-        public s_requests; /* requestId --> requestStatus */
-    // Past request IDs.
-    uint256[] public requestIds;
-    uint256 public lastRequestId;
 
     /** Events */
     event EnteredRaffle(address indexed player);
     event RequestSent(uint256 requestId, uint32 numWords);
-    //event RequestFulfilled(uint256 requestId, uint256[] randomWords);
     event WinnerPicked(address indexed winner);
     event WinnerPickRequestSent(uint256 requestId);
 
@@ -127,6 +114,15 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
         i_callbackGasLimit = callbackGasLimit;
     }
 
+    /*** receive and fallback functions */
+    receive() external payable {
+        enterRaffle();
+    }
+
+    fallback() external payable {
+        enterRaffle();
+    }
+
     /*** external Functions: Start */
 
     /**
@@ -136,9 +132,10 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
      * 3. Automatically called
      */
     function performUpkeep(bytes calldata /* performData */) external override {
-        (bool upkeepNeeded, ) = checkUpkeep(bytes(""));
+        (bool upkeepNeeded, bytes memory _performData) = checkUpkeep(bytes(""));
         if (!upkeepNeeded) {
             revert Automation__UpkeepNotNeeded(
+                abi.decode(_performData, (bool)),
                 address(this).balance,
                 s_players.length,
                 uint256(s_raffleState)
@@ -147,24 +144,6 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
         // Do "pickWinner"
         pickWinner();
     }
-
-    /**
-    // @dev getRequestStatus function
-    function getRequestStatus(
-        uint256 _requestId
-    )
-        external
-        view
-        RaffleIsOpen
-        returns (bool fulfilled, uint256[] memory randomWords)
-    {
-        //require(s_requests[_requestId].exists, "request not found");
-        if (!s_requests[_requestId].exists) revert VRF__RequestNotFound();
-
-        RequestStatus memory request = s_requests[_requestId];
-        return (request.fulfilled, request.randomWords);
-    }
-    */
 
     /*** external Functions: End */
 
@@ -176,7 +155,7 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
          * @dev This check is the best gas efficient way to check if the user has sent enough ETH (compare to the above 2 lines)
          */
         if (msg.value < i_entranceFee)
-            revert Raffle__SendMoreEthToEnterRaffle();
+            revert Raffle__NotEnoughEthSent(msg.value, i_entranceFee);
 
         s_players.push(payable(msg.sender));
         emit EnteredRaffle(msg.sender);
@@ -201,7 +180,7 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
         public
         view
         override
-        returns (bool upkeepNeeded, bytes memory /* performData */)
+        returns (bool upkeepNeeded, bytes memory performData)
     {
         bool isIntervalPassed = (block.timestamp - s_lastTimeStamp) >=
             i_interval;
@@ -212,7 +191,8 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
             isRaffleOpen &&
             contractHasBalance &&
             contractHasPlayers);
-        return (upkeepNeeded, "0x0");
+        performData = abi.encode(isIntervalPassed);
+        return (upkeepNeeded, performData);
     }
 
     /*** public Functions: End */
@@ -226,15 +206,6 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     ) internal override {
         // @dev This function is called by Chainlink VRF Coordinator
 
-        /*
-        // These lines are from example of Chainlink VRF
-        //require(s_requests[_requestId].exists, "request not found");
-        if (!s_requests[_requestId].exists) revert VRF__RequestNotFound();
-        s_requests[_requestId].fulfilled = true;
-        s_requests[_requestId].randomWords = _randomWords;
-        emit RequestFulfilled(_requestId, _randomWords);
-        */
-
         /**** Effects */
         // pick a winner here, send him the reward and reset the raffle
         uint256 numberOfPlayers = s_players.length;
@@ -245,7 +216,6 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
         // Set the raffle state to OPEN
         s_raffleState = RaffleState.OPEN;
         // Reset the players array
-        //delete s_players;
         s_players = new address payable[](0);
         // Reset the last timestamp
         s_lastTimeStamp = block.timestamp;
@@ -301,8 +271,24 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
 
     /*** view & pure Functions: Start */
     /**** Getter Functions: Start */
-    function getEntranceFee() public view returns (uint256) {
+    function getEntranceFee() external view returns (uint256) {
         return i_entranceFee;
+    }
+
+    function getRaffleState() external view returns (RaffleState) {
+        return s_raffleState;
+    }
+
+    function getPlayer(uint256 index) external view returns (address player) {
+        return s_players[index];
+    }
+
+    function getNumberOfPlayers() external view returns (uint256) {
+        return s_players.length;
+    }
+
+    function getLastTimeStamp() external view returns (uint256) {
+        return s_lastTimeStamp;
     }
     /**** Getter Functions: End */
     /*** view & pure Functions: End */
