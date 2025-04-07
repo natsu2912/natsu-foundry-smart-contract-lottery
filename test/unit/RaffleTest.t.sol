@@ -7,6 +7,7 @@ import {Raffle} from "src/Raffle.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
 import {CreateSubscription} from "script/Interactions.s.sol";
 import {console} from "forge-std/Script.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract RaffleTest is Test {
     Raffle internal raffle;
@@ -43,6 +44,10 @@ contract RaffleTest is Test {
         vm.deal(PLAYER_BOB, STARTING_BALANCE);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                              SIMPLE TEST
+    //////////////////////////////////////////////////////////////*/
+
     function testRaffleInitializesInOpenState() external view {
         // Assert
         assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
@@ -51,6 +56,18 @@ contract RaffleTest is Test {
     function testRaffleEntranceFeeIsCorrect() external view {
         // Assert
         assert(raffle.getEntranceFee() == entranceFee);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIER
+    //////////////////////////////////////////////////////////////*/
+
+    modifier aliceEnterRaffleAndTimeHasPassed() {
+        vm.prank(PLAYER_ALICE);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(raffle.getLastTimeStamp() + interval + 1);
+        vm.roll(block.number + 1);
+        _;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -75,12 +92,10 @@ contract RaffleTest is Test {
         assert(raffle.getNumberOfPlayers() == 0);
     }
 
-    function testEnterRaffleRevertWhenRaffleIsNotOpen() external {
-        // Arrange
-        vm.prank(PLAYER_ALICE);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(raffle.getLastTimeStamp() + interval + 1);
-        vm.roll(block.number + 1);
+    function testEnterRaffleRevertWhenRaffleIsNotOpen()
+        external
+        aliceEnterRaffleAndTimeHasPassed
+    {
         // performUpkeep should be successful
         raffle.performUpkeep("");
 
@@ -93,7 +108,7 @@ contract RaffleTest is Test {
         raffle.enterRaffle{value: entranceFee}();
     }
 
-    function testEnterRafflePlayersEnter() external {
+    function testEnterRaffleSuccessful() external {
         // Arrage
         vm.prank(PLAYER_ALICE);
         // Act + Assert #1
@@ -139,24 +154,31 @@ contract RaffleTest is Test {
         assert(abi.decode(performData, (bool)) == true);
     }
 
-    function testCheckUpkeepReturnFalseWhenRaffleIsNotOpen() external {
-        // Arrange
-        vm.prank(PLAYER_ALICE);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(raffle.getLastTimeStamp() + interval + 1);
-        vm.roll(block.number + 1);
+    function testCheckUpkeepReturnFalseWhenRaffleIsNotOpen()
+        external
+        aliceEnterRaffleAndTimeHasPassed
+    {
         // 1st performUpkeep should be successful
         raffle.performUpkeep("");
 
         // Act
         // 2nd performUpkeep should revert because the raffle is in CALCULATING state
-        (bool upkeepNeeded, bytes memory performData) = raffle.checkUpkeep(
-            bytes("")
-        );
+        (bool upkeepNeeded, ) = raffle.checkUpkeep(bytes(""));
 
         // Assert
         assert(upkeepNeeded == false);
         assert(raffle.getRaffleState() != Raffle.RaffleState.OPEN);
+    }
+
+    function testcheckUpkeepReturnTrue()
+        external
+        aliceEnterRaffleAndTimeHasPassed
+    {
+        // Act
+        (bool upkeepNeeded, ) = raffle.checkUpkeep(bytes(""));
+
+        // Assert
+        assert(upkeepNeeded == true);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -199,12 +221,10 @@ contract RaffleTest is Test {
         raffle.performUpkeep("");
     }
 
-    function testPerformUpkeepRevertWhenRaffleIsNotOpen() external {
-        // Arrange
-        vm.prank(PLAYER_ALICE);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(raffle.getLastTimeStamp() + interval + 1);
-        vm.roll(block.number + 1);
+    function testPerformUpkeepRevertWhenRaffleIsNotOpen()
+        external
+        aliceEnterRaffleAndTimeHasPassed
+    {
         // 1st performUpkeep should be successful
         raffle.performUpkeep("");
 
@@ -222,18 +242,46 @@ contract RaffleTest is Test {
         raffle.performUpkeep("");
     }
 
-    function testPerformUpkeepSuccessful() external {
-        // Arrage
-        vm.prank(PLAYER_ALICE);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(raffle.getLastTimeStamp() + interval + 1);
-        vm.roll(block.number + 1);
+    function testPerformUpkeepSuccessfulExpectEmitWhenWeKnowRequestId()
+        external
+        aliceEnterRaffleAndTimeHasPassed
+    {
+        // Act + Assert #1
+        /*
+        // We know requestId is 1 (Only when testing with local Anvil Chain)
+        vm.expectEmit(true, false, false, false, address(raffle));
+        emit Raffle.WinnerPickRequestSent(1); 
+        */
+        vm.expectEmit(false, false, false, false, address(raffle));
+        emit Raffle.WinnerPickRequestSent(0); // requestId is not important because we do not check it
+        raffle.performUpkeep(""); // This call will emit requestId with "emit WinnerPickRequestSent(requestId);"
 
+        // Assert #2 // Todo Temporary assertion, need to learn how to skip to when the Raffle finish the calculation
+        assert(raffle.getRaffleState() == Raffle.RaffleState.CALCULATING);
+
+        ////// Test -> Cannot convert raffle state to OPEN -> Must find out how to "confirm" 3 times (3 times = REQUEST_CONFIRMATIONS)
+        //// Arrange 2 ->
+        //vm.warp(raffle.getLastTimeStamp() + interval * 10 + 1);
+        //vm.roll(block.number + 10);
+        //
+        //// Assert 2
+        //assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
+    }
+
+    function testPerformUpkeepSuccessfulWhenWeDontKnowRequestId()
+        external
+        aliceEnterRaffleAndTimeHasPassed
+    {
         // Act
-        // 1st performUpkeep should be successful
-        raffle.performUpkeep("");
+        vm.recordLogs();
+        raffle.performUpkeep(""); // This call will emit requestId with "emit WinnerPickRequestSent(requestId);"
+        Vm.Log[] memory logEntries = vm.getRecordedLogs();
+        // logEntries[0] is log of function "requestRandomWords" at line "emit RandomWordsRequested(...);" in file "lib/chainlink-brownie-contracts/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol" -> logEntries[1] is log of this "emit WinnerPickRequestSent(requestId);"
+        // logEntries[1].topics[0] is keccak256("WinnerPickRequestSent(uint256)") -> logEntries[1].topics[1] is requestId
+        bytes32 requestId = logEntries[1].topics[1];
 
-        // Assert // Todo Temporary assertion, need to learn how to skip to when the Raffle finish the calculation
+        // Assert
+        assert(uint256(requestId) > 0);
         assert(raffle.getRaffleState() == Raffle.RaffleState.CALCULATING);
     }
 

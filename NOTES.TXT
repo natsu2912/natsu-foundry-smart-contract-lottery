@@ -1,5 +1,17 @@
-1. Cannot receive the correct subcription ID when running this command 
-    forge script script/Interactions.s.sol:CreateSubscription --rpc-url $SEPOLIA_RPC_URL --account $SEPOLIA_ACCOUNT --password $KEYSTORE_PASSWORD -vvvvv
+1. Cannot receive the correct subcription ID when running these commands
+    1. Sepolia Eth
+        Command
+            forge script script/Interactions.s.sol:CreateSubscription --rpc-url $SEPOLIA_RPC_URL --account $SEPOLIA_ACCOUNT --password $KEYSTORE_PASSWORD -vvvvv
+        Error
+            Run successfully -> However, wrong subscription id is returned -> Can not you it programatically
+    2. Local Anvil
+        Command
+            forge script script/Interactions.s.sol:CreateSubscription --rpc-url $LOCAL_RPC_URL --account $LOCAL_ACCOUNT --password $KEYSTORE_PASSWORD -vvvvv
+        Error
+            ├─ [2811] VRFCoordinatorV2_5Mock::createSubscription()
+            │   └─ ← [Revert] panic: arithmetic underflow or overflow (0x11)
+            └─ ← [Revert] panic: arithmetic underflow or overflow (0x11)
+
 
 2. Cannot run this command with local Anvil chain
     Command:
@@ -13,3 +25,5 @@
         Do not know why fail when running "forge script"
 
 3. Remember to finish "Todo"
+
+4. Lessons are using solidify 0.8.19 while we use 0.8.28
