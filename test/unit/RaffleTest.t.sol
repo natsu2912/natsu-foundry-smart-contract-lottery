@@ -5,24 +5,29 @@ import {Test} from "forge-std/Test.sol";
 import {DeployRaffle} from "script/DeployRaffle.s.sol";
 import {Raffle} from "src/Raffle.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
+import {CreateSubscription} from "script/Interactions.s.sol";
+import {console} from "forge-std/Script.sol";
 
 contract RaffleTest is Test {
     Raffle internal raffle;
     HelperConfig internal helperConfig;
-    address internal PLAYER_ALICE = makeAddr("PlayerAlice");
-    address internal PLAYER_BOB = makeAddr("PlayerBob");
-    uint256 internal STARTING_BALANCE = 100 ether;
-    uint256 internal entranceFee;
-    uint256 internal interval;
-    address internal vrfCoordinator;
-    bytes32 internal gasLane;
-    uint64 internal subscriptionId;
-    uint32 internal callbackGasLimit;
+    address private PLAYER_ALICE = makeAddr("PlayerAlice");
+    address private PLAYER_BOB = makeAddr("PlayerBob");
+    uint256 private STARTING_BALANCE = 100 ether;
+    uint256 private entranceFee;
+    uint256 private interval;
+    address private vrfCoordinator;
+    bytes32 private gasLane;
+    uint256 private subscriptionId;
+    uint32 private callbackGasLimit;
+    address private linkTokenContract;
 
     function setUp() external {
-        // Set up the test environment
+        // Deploy the Raffle contract
         DeployRaffle raffleDeployer = new DeployRaffle();
         (raffle, helperConfig) = raffleDeployer.deployContract();
+
+        // Get network configuration
         HelperConfig.NetworkConfig memory networkConfig = helperConfig
             .getActiveNetworkConfig();
         entranceFee = networkConfig.entranceFee;
@@ -31,13 +36,14 @@ contract RaffleTest is Test {
         gasLane = networkConfig.gasLane;
         subscriptionId = networkConfig.subscriptionId;
         callbackGasLimit = networkConfig.callbackGasLimit;
+        linkTokenContract = networkConfig.linkTokenContract;
 
         // Give players some ether
         vm.deal(PLAYER_ALICE, STARTING_BALANCE);
         vm.deal(PLAYER_BOB, STARTING_BALANCE);
     }
 
-    function testRaffleInitializsInOpenState() external view {
+    function testRaffleInitializesInOpenState() external view {
         // Assert
         assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
     }
@@ -46,6 +52,10 @@ contract RaffleTest is Test {
         // Assert
         assert(raffle.getEntranceFee() == entranceFee);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                              ENTER RAFFLE
+    //////////////////////////////////////////////////////////////*/
 
     function testEnterRaffleRevertWhenDontPayEnoughToEnterRaffle() external {
         // Arragnge
@@ -65,11 +75,23 @@ contract RaffleTest is Test {
         assert(raffle.getNumberOfPlayers() == 0);
     }
 
-    // Todo
-    //function testEnterRaffleRevertWhenRaffleIsNotOpen() external {
-    //    vm.prank(PLAYER_ALICE);
-    //    raffle.enterRaffle{value: entranceFee}();
-    //}
+    function testEnterRaffleRevertWhenRaffleIsNotOpen() external {
+        // Arrange
+        vm.prank(PLAYER_ALICE);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(raffle.getLastTimeStamp() + interval + 1);
+        vm.roll(block.number + 1);
+        // performUpkeep should be successful
+        raffle.performUpkeep("");
+
+        // Act + Assert
+        // enterRaffle should revert because the raffle is in CALCULATING state
+        vm.expectRevert(
+            abi.encodeWithSelector(Raffle.Raffle__RaffleNotOpen.selector)
+        );
+        vm.prank(PLAYER_BOB);
+        raffle.enterRaffle{value: entranceFee}();
+    }
 
     function testEnterRafflePlayersEnter() external {
         // Arrage
@@ -85,11 +107,67 @@ contract RaffleTest is Test {
         assert(raffle.getPlayer(0) == PLAYER_ALICE);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                              CHECK UPKEEP
+    //////////////////////////////////////////////////////////////*/
+
+    function testCheckUpkeepReturnFalseWhenIntervalIsNotPassed() external {
+        // Arrage
+        vm.prank(PLAYER_ALICE);
+        raffle.enterRaffle{value: entranceFee}();
+        // Act
+        (bool upkeepNeeded, bytes memory performData) = raffle.checkUpkeep(
+            bytes("")
+        );
+        // Assert
+        assert(upkeepNeeded == false);
+        assert(abi.decode(performData, (bool)) == false);
+    }
+
+    function testCheckUpkeepReturnFalseWhenContractNotHasBalanceAndNotHasPlayer()
+        external
+    {
+        // Arrange
+        vm.warp(raffle.getLastTimeStamp() + interval);
+        vm.roll(block.number + 1);
+        // Act
+        (bool upkeepNeeded, bytes memory performData) = raffle.checkUpkeep(
+            bytes("")
+        );
+        // Assert
+        assert(upkeepNeeded == false);
+        assert(abi.decode(performData, (bool)) == true);
+    }
+
+    function testCheckUpkeepReturnFalseWhenRaffleIsNotOpen() external {
+        // Arrange
+        vm.prank(PLAYER_ALICE);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(raffle.getLastTimeStamp() + interval + 1);
+        vm.roll(block.number + 1);
+        // 1st performUpkeep should be successful
+        raffle.performUpkeep("");
+
+        // Act
+        // 2nd performUpkeep should revert because the raffle is in CALCULATING state
+        (bool upkeepNeeded, bytes memory performData) = raffle.checkUpkeep(
+            bytes("")
+        );
+
+        // Assert
+        assert(upkeepNeeded == false);
+        assert(raffle.getRaffleState() != Raffle.RaffleState.OPEN);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             PERFORM UPKEEP
+    //////////////////////////////////////////////////////////////*/
+
     function testPerformUpkeepRevertWhenIntervalIsNotPassed() external {
         // Arrage
         vm.prank(PLAYER_ALICE);
-        // Act + Assert
         raffle.enterRaffle{value: entranceFee}();
+        // Act + Assert
         vm.expectRevert(
             abi.encodeWithSelector(
                 Raffle.Automation__UpkeepNotNeeded.selector,
@@ -107,40 +185,61 @@ contract RaffleTest is Test {
     {
         // Arrange
         vm.warp(raffle.getLastTimeStamp() + interval);
+        vm.roll(block.number + 1);
         // Act + Assert
         vm.expectRevert(
             abi.encodeWithSelector(
                 Raffle.Automation__UpkeepNotNeeded.selector,
-                true,
-                0,
-                0,
+                true, // interval has passed
+                0, // contract balance
+                0, // number of players
                 Raffle.RaffleState.OPEN
             )
         );
         raffle.performUpkeep("");
     }
 
-    // Todo
-    //function testPerformUpkeepRevertWhenRaffleIsNotOpen() external {
-    //    vm.prank(PLAYER_ALICE);
-    //    raffle.enterRaffle{value: entranceFee}();
-    //    vm.warp(raffle.getLastTimeStamp() + interval);
-    //
-    //    // 1st performUpkeep should be successful
-    //    raffle.performUpkeep("");
-    //
-    //    // 2nd performUpkeep should revert
-    //    vm.expectRevert(
-    //        abi.encodeWithSelector(
-    //            Raffle.Automation__UpkeepNotNeeded.selector,
-    //            true,
-    //            entranceFee,
-    //            1,
-    //            Raffle.RaffleState.CALCULATING
-    //        )
-    //    );
-    //    raffle.performUpkeep("");
-    //}
+    function testPerformUpkeepRevertWhenRaffleIsNotOpen() external {
+        // Arrange
+        vm.prank(PLAYER_ALICE);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(raffle.getLastTimeStamp() + interval + 1);
+        vm.roll(block.number + 1);
+        // 1st performUpkeep should be successful
+        raffle.performUpkeep("");
+
+        // Act + Assert
+        // 2nd performUpkeep should revert because the raffle is in CALCULATING state
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Raffle.Automation__UpkeepNotNeeded.selector,
+                true, // interval has passed
+                entranceFee, // contract balance
+                1, // number of players
+                Raffle.RaffleState.CALCULATING
+            )
+        );
+        raffle.performUpkeep("");
+    }
+
+    function testPerformUpkeepSuccessful() external {
+        // Arrage
+        vm.prank(PLAYER_ALICE);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(raffle.getLastTimeStamp() + interval + 1);
+        vm.roll(block.number + 1);
+
+        // Act
+        // 1st performUpkeep should be successful
+        raffle.performUpkeep("");
+
+        // Assert // Todo Temporary assertion, need to learn how to skip to when the Raffle finish the calculation
+        assert(raffle.getRaffleState() == Raffle.RaffleState.CALCULATING);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                FALLBACK
+    //////////////////////////////////////////////////////////////*/
 
     function testFallbackWhenPlayerSendEth() external {
         // Arrange
@@ -178,6 +277,10 @@ contract RaffleTest is Test {
         assert(raffle.getNumberOfPlayers() == 0);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                RECEIVE
+    //////////////////////////////////////////////////////////////*/
+
     function testReceiveWhenPlayerSendEth() external {
         // Arrange
         vm.prank(PLAYER_ALICE);
@@ -211,8 +314,4 @@ contract RaffleTest is Test {
         assert(PLAYER_ALICE.balance == STARTING_BALANCE);
         assert(raffle.getNumberOfPlayers() == 0);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              ENTER RAFFLE
-    //////////////////////////////////////////////////////////////*/
 }

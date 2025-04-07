@@ -1,0 +1,15 @@
+1. Cannot receive the correct subcription ID when running this command 
+    forge script script/Interactions.s.sol:CreateSubscription --rpc-url $SEPOLIA_RPC_URL --account $SEPOLIA_ACCOUNT --password $KEYSTORE_PASSWORD -vvvvv
+
+2. Cannot run this command with local Anvil chain
+    Command:
+        forge script script/Interactions.s.sol:CreateSubscription --rpc-url $LOCAL_RPC_URL --account $LOCAL_ACCOUNT --password $KEYSTORE_PASSWORD -vvvvv --broadcast
+    Error
+        ├─ [2811] VRFCoordinatorV2_5Mock::createSubscription()
+        │   └─ ← [Revert] panic: arithmetic underflow or overflow (0x11)
+        └─ ← [Revert] panic: arithmetic underflow or overflow (0x11)
+    Note:
+        Run "forge test" successfully -> tests used "VRFCoordinatorV2_5Mock::createSubscription" successfully
+        Do not know why fail when running "forge script"
+
+3. Remember to finish "Todo"
