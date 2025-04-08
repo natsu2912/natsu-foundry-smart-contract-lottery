@@ -60,7 +60,7 @@ contract DeployRaffle is Script {
             ) = subscriptionCreator
                 .createSubscriptionUsingVrfCoordinatorAddress(
                     address(networkConfig.vrfCoordinator),
-                    networkConfig.deployerKey
+                    networkConfig.deployerAccount
                 );
         }
 
@@ -77,7 +77,7 @@ contract DeployRaffle is Script {
                 networkConfig.subscriptionId,
                 LINK_AMOUNT_TO_FUND,
                 networkConfig.linkTokenContract,
-                networkConfig.deployerKey
+                networkConfig.deployerAccount
             );
         }
 
@@ -100,7 +100,7 @@ contract DeployRaffle is Script {
             networkConfig.vrfCoordinator,
             networkConfig.subscriptionId,
             address(raffle),
-            networkConfig.deployerKey
+            networkConfig.deployerAccount
         );
 
         // Return

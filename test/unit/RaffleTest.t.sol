@@ -25,7 +25,7 @@ contract RaffleTest is Test {
     uint256 private s_subscriptionId;
     uint32 private s_callbackGasLimit;
     address private s_linkTokenContract;
-    uint256 private s_deployerKey;
+    address private s_deployerAccount;
 
     function setUp() external {
         // Deploy the Raffle contract
@@ -42,7 +42,7 @@ contract RaffleTest is Test {
         s_subscriptionId = networkConfig.subscriptionId;
         s_callbackGasLimit = networkConfig.callbackGasLimit;
         s_linkTokenContract = networkConfig.linkTokenContract;
-        s_deployerKey = networkConfig.deployerKey;
+        s_deployerAccount = networkConfig.deployerAccount;
 
         // Give players some ether
         vm.deal(PLAYER_ALICE, STARTING_BALANCE);
@@ -88,7 +88,8 @@ contract RaffleTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testEnterRaffleRevertWhenDontPayEnoughToEnterRaffle() external {
-        // Arragnge
+        // Arrange
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         // Act + Assert #1
         vm.expectRevert(
@@ -100,7 +101,7 @@ contract RaffleTest is Test {
         );
         s_raffle.enterRaffle{value: s_entranceFee - 1 wei}();
         // Assert #2
-        assert(address(s_raffle).balance == 0);
+        assert(address(s_raffle).balance == startingRaffleBalance);
         assert(PLAYER_ALICE.balance == STARTING_BALANCE);
         assert(s_raffle.getNumberOfPlayers() == 0);
     }
@@ -123,13 +124,17 @@ contract RaffleTest is Test {
 
     function testEnterRaffleSuccessful() external {
         // Arrage
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         // Act + Assert #1
         vm.expectEmit(true, false, false, false, address(s_raffle));
         emit Raffle.EnteredRaffle(PLAYER_ALICE);
         s_raffle.enterRaffle{value: s_entranceFee}();
         // Assert #2
-        assert(address(s_raffle).balance == s_entranceFee);
+
+        assert(
+            address(s_raffle).balance == startingRaffleBalance + s_entranceFee
+        );
         assert(PLAYER_ALICE.balance == STARTING_BALANCE - s_entranceFee);
         assert(s_raffle.getNumberOfPlayers() == 1);
         assert(s_raffle.getPlayer(0) == PLAYER_ALICE);
@@ -200,6 +205,7 @@ contract RaffleTest is Test {
 
     function testPerformUpkeepRevertWhenIntervalIsNotPassed() external {
         // Arrage
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         s_raffle.enterRaffle{value: s_entranceFee}();
         // Act + Assert
@@ -207,7 +213,7 @@ contract RaffleTest is Test {
             abi.encodeWithSelector(
                 Raffle.Automation__UpkeepNotNeeded.selector,
                 false,
-                s_entranceFee,
+                startingRaffleBalance + s_entranceFee,
                 1,
                 Raffle.RaffleState.OPEN
             )
@@ -219,6 +225,7 @@ contract RaffleTest is Test {
         external
     {
         // Arrange
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.warp(s_raffle.getLastTimeStamp() + s_interval);
         vm.roll(block.number + 1);
         // Act + Assert
@@ -226,7 +233,7 @@ contract RaffleTest is Test {
             abi.encodeWithSelector(
                 Raffle.Automation__UpkeepNotNeeded.selector,
                 true, // interval has passed
-                0, // contract balance
+                startingRaffleBalance, // contract balance
                 0, // number of players
                 Raffle.RaffleState.OPEN
             )
@@ -238,6 +245,8 @@ contract RaffleTest is Test {
         external
         aliceEnterRaffleAndTimeHasPassed
     {
+        // Arrange
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         // 1st performUpkeep should be successful
         s_raffle.performUpkeep("");
 
@@ -247,7 +256,7 @@ contract RaffleTest is Test {
             abi.encodeWithSelector(
                 Raffle.Automation__UpkeepNotNeeded.selector,
                 true, // interval has passed
-                s_entranceFee, // contract balance
+                startingRaffleBalance, // contract balance
                 1, // number of players
                 Raffle.RaffleState.CALCULATING
             )
@@ -304,6 +313,7 @@ contract RaffleTest is Test {
 
     function testFallbackWhenPlayerSendEth() external {
         // Arrange
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         // Act
         (bool success, ) = address(s_raffle).call{value: s_entranceFee}(
@@ -311,7 +321,9 @@ contract RaffleTest is Test {
         );
         // Assert
         assert(success);
-        assert(address(s_raffle).balance == s_entranceFee);
+        assert(
+            address(s_raffle).balance == startingRaffleBalance + s_entranceFee
+        );
         assert(PLAYER_ALICE.balance == STARTING_BALANCE - s_entranceFee);
         assert(s_raffle.getNumberOfPlayers() == 1);
         assert(s_raffle.getPlayer(0) == PLAYER_ALICE);
@@ -319,6 +331,7 @@ contract RaffleTest is Test {
 
     function testFallbackWhenPlayerDontSendEth() external {
         // Arrange
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         // Act + Assert #1
         vm.expectRevert(
@@ -333,7 +346,7 @@ contract RaffleTest is Test {
         }(hex"abcdef"); // This call should revert and sucess should be false
         // Assert #2
         assert(success == false);
-        assert(address(s_raffle).balance == 0);
+        assert(address(s_raffle).balance == startingRaffleBalance);
         assert(PLAYER_ALICE.balance == STARTING_BALANCE);
         assert(s_raffle.getNumberOfPlayers() == 0);
     }
@@ -344,12 +357,15 @@ contract RaffleTest is Test {
 
     function testReceiveWhenPlayerSendEth() external {
         // Arrange
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         // Act
         (bool success, ) = address(s_raffle).call{value: s_entranceFee}("");
         // Assert
         assert(success);
-        assert(address(s_raffle).balance == s_entranceFee);
+        assert(
+            address(s_raffle).balance == startingRaffleBalance + s_entranceFee
+        );
         assert(PLAYER_ALICE.balance == STARTING_BALANCE - s_entranceFee);
         assert(s_raffle.getNumberOfPlayers() == 1);
         assert(s_raffle.getPlayer(0) == PLAYER_ALICE);
@@ -357,6 +373,7 @@ contract RaffleTest is Test {
 
     function testReceiveWhenPlayerDontSendEth() external {
         // Arrage
+        uint256 startingRaffleBalance = address(s_raffle).balance;
         vm.prank(PLAYER_ALICE);
         // Act + Assert #1
         vm.expectRevert(
@@ -371,7 +388,7 @@ contract RaffleTest is Test {
         }(""); // This call should revert and sucess should be false
         // Assert #2
         assert(success == false);
-        assert(address(s_raffle).balance == 0);
+        assert(address(s_raffle).balance == startingRaffleBalance);
         assert(PLAYER_ALICE.balance == STARTING_BALANCE);
         assert(s_raffle.getNumberOfPlayers() == 0);
     }

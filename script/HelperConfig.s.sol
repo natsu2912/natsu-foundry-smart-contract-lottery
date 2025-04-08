@@ -48,7 +48,7 @@ contract HelperConfig is Script, Constants {
         uint256 subscriptionId;
         uint32 callbackGasLimit;
         address linkTokenContract;
-        uint256 deployerKey;
+        address deployerAccount;
     }
 
     mapping(uint256 => NetworkConfig) private s_networkConfigs;
@@ -83,7 +83,7 @@ contract HelperConfig is Script, Constants {
                 subscriptionId: 0,
                 callbackGasLimit: 500000,
                 linkTokenContract: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
-                deployerKey: vm.envUint("SEPOLIA_PRIVATE_KEY")
+                deployerAccount: vm.envAddress("SEPOLIA_SENDER_ADDRESS")
             });
     }
 
@@ -118,7 +118,7 @@ contract HelperConfig is Script, Constants {
                     subscriptionId: 0,
                     callbackGasLimit: 500000,
                     linkTokenContract: address(linkToken),
-                    deployerKey: vm.envUint("LOCAL_PRIVATE_KEY")
+                    deployerAccount: vm.envAddress("LOCAL_SENDER_ADDRESS")
                 });
         }
     }
