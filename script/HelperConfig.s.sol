@@ -78,7 +78,9 @@ contract HelperConfig is Script, Constants {
                 interval: 30, // 30 seconds
                 vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
                 gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
-                subscriptionId: 70114033652876626055761777853900633248033356250955478684534941029272930067759,
+                //subscriptionId: 70114033652876626055761777853900633248033356250955478684534941029272930067759, // wrong subId, created when testing
+                //subscriptionId: 112508787565041413133707041134491316795283384790279550650135492764536720496235, // correct subId, view on website
+                subscriptionId: 0,
                 callbackGasLimit: 500000,
                 linkTokenContract: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
                 deployerKey: vm.envUint("SEPOLIA_PRIVATE_KEY")
