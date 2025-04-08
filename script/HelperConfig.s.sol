@@ -27,8 +27,8 @@
 pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
-//import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
-import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
+import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+//import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 import {LinkToken} from "test/mocks/LinkToken.sol";
 
 abstract contract Constants {
@@ -99,11 +99,11 @@ contract HelperConfig is Script, Constants {
 
             // Create a new VRFCoordinator Mock instance and a new LinkToken instance
             vm.startBroadcast();
-            VRFCoordinatorV2Mock mockVrfCoordinator = new VRFCoordinatorV2Mock(
-                MOCK_BASE_FEE,
-                MOCK_GAS_PRICE_LINK //,
-                //MOCK_WEI_PER_UNIT_LINK
-            );
+            VRFCoordinatorV2_5Mock mockVrfCoordinator = new VRFCoordinatorV2_5Mock(
+                    MOCK_BASE_FEE,
+                    MOCK_GAS_PRICE_LINK,
+                    MOCK_WEI_PER_UNIT_LINK
+                );
             LinkToken linkToken = new LinkToken();
             vm.stopBroadcast();
             // Return a new NetworkConfig instance

@@ -29,8 +29,9 @@ import {Script, console} from "forge-std/Script.sol";
 import {Raffle} from "../src/Raffle.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 import {CreateSubscription, FundSubscription, AddConsumer} from "./Interactions.s.sol";
-//import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
-import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
+import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+
+//import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 
 contract DeployRaffle is Script {
     /**
@@ -66,9 +67,9 @@ contract DeployRaffle is Script {
         // Fund subscription if LINK < 5 ether
         uint256 MINIMUM_LINK_AMOUNT = 300 ether; // 300 LINK
         uint256 LINK_AMOUNT_TO_FUND = 300 ether; // 300 LINK
-        (uint96 current_subscription_balance, , , ) = VRFCoordinatorV2Mock(
+        (uint256 current_subscription_balance, , , , ) = VRFCoordinatorV2_5Mock(
             networkConfig.vrfCoordinator
-        ).getSubscription(uint64(networkConfig.subscriptionId));
+        ).getSubscription(networkConfig.subscriptionId);
         if (current_subscription_balance < MINIMUM_LINK_AMOUNT) {
             FundSubscription subscriptionFunder = new FundSubscription();
             subscriptionFunder.fundSubscription(

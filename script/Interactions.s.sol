@@ -3,8 +3,8 @@ pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {HelperConfig, Constants} from "./HelperConfig.s.sol";
-//import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
-import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
+import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+//import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 import {LinkToken} from "test/mocks/LinkToken.sol";
 //import {LinkTokenInterface} from "@chainlink/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IVRFCoordinatorV2Plus} from "@chainlink/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
@@ -21,7 +21,7 @@ contract CreateSubscription is Script, Constants {
                 "[*] Creating a new subcription for chain LOCAL_ANVIL_CHAIN_ID"
             );
             vm.startBroadcast(deployerKey); // Only subscription owner (creator) to be DefaultSender when testing
-            subId = VRFCoordinatorV2Mock(vrfCoordinator).createSubscription();
+            subId = VRFCoordinatorV2_5Mock(vrfCoordinator).createSubscription();
             vm.stopBroadcast();
         } else if (block.chainid == ETH_SEPOLIA_CHAIN_ID) {
             console.log(
@@ -81,9 +81,9 @@ contract FundSubscription is Script, Constants {
 
         if (block.chainid == LOCAL_ANVIL_CHAIN_ID) {
             vm.startBroadcast(deployerKey); // Use balance of DefaultSender to fund. Note: Can use balance //of another account
-            VRFCoordinatorV2Mock(vrfCoordinator).fundSubscription(
-                uint64(subId),
-                uint96(linkAmountToFund)
+            VRFCoordinatorV2_5Mock(vrfCoordinator).fundSubscription(
+                subId,
+                linkAmountToFund
             );
             vm.stopBroadcast();
         } else {
@@ -153,10 +153,7 @@ contract AddConsumer is Script {
         console.log("On chain id: ", block.chainid);
 
         vm.startBroadcast(deployerKey); // Only subscription owner (creator) can add consumer
-        VRFCoordinatorV2Mock(vrfCoordinator).addConsumer(
-            uint64(subId),
-            consumer
-        );
+        VRFCoordinatorV2_5Mock(vrfCoordinator).addConsumer(subId, consumer);
         vm.stopBroadcast();
     }
 
