@@ -24,10 +24,11 @@
 
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
-import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+//import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 import {LinkToken} from "test/mocks/LinkToken.sol";
 
 abstract contract Constants {
@@ -47,6 +48,7 @@ contract HelperConfig is Script, Constants {
         uint256 subscriptionId;
         uint32 callbackGasLimit;
         address linkTokenContract;
+        uint256 deployerKey;
     }
 
     mapping(uint256 => NetworkConfig) private s_networkConfigs;
@@ -67,7 +69,7 @@ contract HelperConfig is Script, Constants {
 
     function getSepoliaEthConfig()
         internal
-        pure
+        view
         returns (NetworkConfig memory)
     {
         return
@@ -78,7 +80,8 @@ contract HelperConfig is Script, Constants {
                 gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
                 subscriptionId: 70114033652876626055761777853900633248033356250955478684534941029272930067759,
                 callbackGasLimit: 500000,
-                linkTokenContract: 0x779877A7B0D9E8603169DdbD7836e478b4624789
+                linkTokenContract: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
+                deployerKey: vm.envUint("SEPOLIA_PRIVATE_KEY")
             });
     }
 
@@ -94,13 +97,13 @@ contract HelperConfig is Script, Constants {
             uint96 MOCK_GAS_PRICE_LINK = 1e9; // 0.000000001 LINK per gas
             int256 MOCK_WEI_PER_UNIT_LINK = 4e15; // 1 LINK = 4e15 wei = 0.004 ether;
 
-            // Create a new VRFCoordinatorV2_5Mock instance and a new LinkToken instance
+            // Create a new VRFCoordinator Mock instance and a new LinkToken instance
             vm.startBroadcast();
-            VRFCoordinatorV2_5Mock mockVrfCoordinator = new VRFCoordinatorV2_5Mock(
-                    MOCK_BASE_FEE,
-                    MOCK_GAS_PRICE_LINK,
-                    MOCK_WEI_PER_UNIT_LINK
-                );
+            VRFCoordinatorV2Mock mockVrfCoordinator = new VRFCoordinatorV2Mock(
+                MOCK_BASE_FEE,
+                MOCK_GAS_PRICE_LINK //,
+                //MOCK_WEI_PER_UNIT_LINK
+            );
             LinkToken linkToken = new LinkToken();
             vm.stopBroadcast();
             // Return a new NetworkConfig instance
@@ -112,7 +115,8 @@ contract HelperConfig is Script, Constants {
                     gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae, // gasLane value doesn't matter in Local Anvil network
                     subscriptionId: 0,
                     callbackGasLimit: 500000,
-                    linkTokenContract: address(linkToken)
+                    linkTokenContract: address(linkToken),
+                    deployerKey: vm.envUint("LOCAL_PRIVATE_KEY")
                 });
         }
     }

@@ -8,12 +8,16 @@ remappings = [
     '@chainlink/=lib/chainlink-brownie-contracts/contracts/',
     #'@chainlink/=lib/chainlink/contracts/',
     '@solmate=lib/solmate/src/',
+    '@openzeppelin/=lib/openzeppelin-contracts/contracts/',
 ]
 
 fs_permissions = [
     { access = "read", path = "./broadcast" },
     { access = "read", path = "./reports" },
 ]
+
+[fuzz]
+runs = 256
 
 # Set it to make use of reverting errors in "require" statements
 # This will make the compiler emit a revert opcode instead of an invalid opcode

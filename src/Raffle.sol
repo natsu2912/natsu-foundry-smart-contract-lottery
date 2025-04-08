@@ -25,7 +25,7 @@
 //---------------------------------------------
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
@@ -220,7 +220,7 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
         s_lastTimeStamp = block.timestamp;
 
         // Emit the event
-        emit WinnerPicked(s_lastWinner);
+        emit WinnerPicked(winner);
 
         /**** Interactions (External contract interactions) */
         // Transfer prize to winner
@@ -289,6 +289,11 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     function getLastTimeStamp() external view returns (uint256) {
         return s_lastTimeStamp;
     }
+
+    function getLastWinner() external view returns (address) {
+        return s_lastWinner;
+    }
+
     /**** Getter Functions: End */
     /*** view & pure Functions: End */
 

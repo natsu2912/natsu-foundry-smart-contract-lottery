@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {HelperConfig, Constants} from "./HelperConfig.s.sol";
-import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+//import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 import {LinkToken} from "test/mocks/LinkToken.sol";
 //import {LinkTokenInterface} from "@chainlink/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IVRFCoordinatorV2Plus} from "@chainlink/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
@@ -11,15 +12,16 @@ import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
 
 contract CreateSubscription is Script, Constants {
     function createSubscriptionUsingVrfCoordinatorAddress(
-        address vrfCoordinator
+        address vrfCoordinator,
+        uint256 deployerKey
     ) public returns (uint256 subId, address _vrfCoordinator) {
         // Create subcription
         if (block.chainid == LOCAL_ANVIL_CHAIN_ID) {
             console.log(
                 "[*] Creating a new subcription for chain LOCAL_ANVIL_CHAIN_ID"
             );
-            vm.startBroadcast(); // Only subscription owner (creator) to be DefaultSender when testing
-            subId = VRFCoordinatorV2_5Mock(vrfCoordinator).createSubscription();
+            vm.startBroadcast(deployerKey); // Only subscription owner (creator) to be DefaultSender when testing
+            subId = VRFCoordinatorV2Mock(vrfCoordinator).createSubscription();
             vm.stopBroadcast();
         } else if (block.chainid == ETH_SEPOLIA_CHAIN_ID) {
             console.log(
@@ -27,7 +29,7 @@ contract CreateSubscription is Script, Constants {
             );
             console.log("msg.sender #1: ", msg.sender);
             console.log("Tx sent from #1: ", tx.origin);
-            vm.startBroadcast(); // Only subscription owner (creator) to be DefaultSender when testing
+            vm.startBroadcast(deployerKey); // Only subscription owner (creator) to be DefaultSender when testing
             console.log("msg.sender #1: ", msg.sender);
             console.log("Tx sent from #2: ", tx.origin);
             subId = IVRFCoordinatorV2Plus(vrfCoordinator).createSubscription();
@@ -49,7 +51,8 @@ contract CreateSubscription is Script, Constants {
             .getActiveNetworkConfig();
         // Create subcription from network config
         (subId, vrfCoordinator) = createSubscriptionUsingVrfCoordinatorAddress(
-            networkConfig.vrfCoordinator
+            networkConfig.vrfCoordinator,
+            networkConfig.deployerKey
         );
         // Return
         return (subId, vrfCoordinator);
@@ -68,7 +71,8 @@ contract FundSubscription is Script, Constants {
         address vrfCoordinator,
         uint256 subId,
         uint256 linkAmountToFund,
-        address linkTokenContract
+        address linkTokenContract,
+        uint256 deployerKey
     ) public {
         console.log("Funding subscription: ", subId);
         console.log("Using vrfCoordinator: ", vrfCoordinator);
@@ -76,10 +80,10 @@ contract FundSubscription is Script, Constants {
         console.log("linkTokenContract: ", linkTokenContract);
 
         if (block.chainid == LOCAL_ANVIL_CHAIN_ID) {
-            vm.startBroadcast(); // Use balance of DefaultSender to fund. Note: Can use balance //of another account
-            VRFCoordinatorV2_5Mock(vrfCoordinator).fundSubscription(
-                subId,
-                linkAmountToFund
+            vm.startBroadcast(deployerKey); // Use balance of DefaultSender to fund. Note: Can use balance //of another account
+            VRFCoordinatorV2Mock(vrfCoordinator).fundSubscription(
+                uint64(subId),
+                uint96(linkAmountToFund)
             );
             vm.stopBroadcast();
         } else {
@@ -87,7 +91,7 @@ contract FundSubscription is Script, Constants {
             console.log(msg.sender);
             console.log(LinkToken(linkTokenContract).balanceOf(address(this)));
             console.log(address(this));
-            vm.startBroadcast();
+            vm.startBroadcast(deployerKey);
             LinkToken(linkTokenContract).transferAndCall(
                 vrfCoordinator,
                 linkAmountToFund,
@@ -111,7 +115,8 @@ contract FundSubscription is Script, Constants {
                 networkConfig.vrfCoordinator // Set vrfCoordinator after creation
             ) = subscriptionCreator
                 .createSubscriptionUsingVrfCoordinatorAddress(
-                    networkConfig.vrfCoordinator
+                    networkConfig.vrfCoordinator,
+                    networkConfig.deployerKey
                 );
             console.log(
                 "New SubId Created! ",
@@ -125,12 +130,13 @@ contract FundSubscription is Script, Constants {
             networkConfig.vrfCoordinator,
             networkConfig.subscriptionId,
             linkAmountToFund,
-            networkConfig.linkTokenContract
+            networkConfig.linkTokenContract,
+            networkConfig.deployerKey
         );
     }
 
     function run() external {
-        uint256 LINK_AMOUNT_TO_FUND = 1 ether; // 10 LINK
+        uint256 LINK_AMOUNT_TO_FUND = 100 ether; // 100 LINK
         fundSubscriptionUsingConfig(LINK_AMOUNT_TO_FUND);
     }
 }
@@ -139,14 +145,18 @@ contract AddConsumer is Script {
     function addConsumer(
         address vrfCoordinator,
         uint256 subId,
-        address consumer
+        address consumer,
+        uint256 deployerKey
     ) public {
         console.log("Adding consumer contract: ", consumer);
         console.log("Using VRFCoordinator: ", vrfCoordinator);
         console.log("On chain id: ", block.chainid);
 
-        vm.startBroadcast(); // Only subscription owner (creator) can add consumer
-        VRFCoordinatorV2_5Mock(vrfCoordinator).addConsumer(subId, consumer);
+        vm.startBroadcast(deployerKey); // Only subscription owner (creator) can add consumer
+        VRFCoordinatorV2Mock(vrfCoordinator).addConsumer(
+            uint64(subId),
+            consumer
+        );
         vm.stopBroadcast();
     }
 
@@ -159,7 +169,8 @@ contract AddConsumer is Script {
         addConsumer(
             networkConfig.vrfCoordinator,
             networkConfig.subscriptionId,
-            raffle
+            raffle,
+            networkConfig.deployerKey
         );
     }
 

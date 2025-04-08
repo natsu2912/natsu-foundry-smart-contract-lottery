@@ -23,13 +23,14 @@
 // view & pure functions
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Raffle} from "../src/Raffle.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 import {CreateSubscription, FundSubscription, AddConsumer} from "./Interactions.s.sol";
-import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+//import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 
 contract DeployRaffle is Script {
     /**
@@ -57,23 +58,25 @@ contract DeployRaffle is Script {
                 networkConfig.vrfCoordinator // Set vrfCoordinator after creation
             ) = subscriptionCreator
                 .createSubscriptionUsingVrfCoordinatorAddress(
-                    address(networkConfig.vrfCoordinator)
+                    address(networkConfig.vrfCoordinator),
+                    networkConfig.deployerKey
                 );
         }
 
         // Fund subscription if LINK < 5 ether
-        uint256 MINIMUM_LINK_AMOUNT = 1 ether; // 5 LINK
-        uint256 LINK_AMOUNT_TO_FUND = 1 ether; // 10 LINK
-        (uint256 current_subscription_balance, , , , ) = VRFCoordinatorV2_5Mock(
+        uint256 MINIMUM_LINK_AMOUNT = 300 ether; // 300 LINK
+        uint256 LINK_AMOUNT_TO_FUND = 300 ether; // 300 LINK
+        (uint96 current_subscription_balance, , , ) = VRFCoordinatorV2Mock(
             networkConfig.vrfCoordinator
-        ).getSubscription(networkConfig.subscriptionId);
+        ).getSubscription(uint64(networkConfig.subscriptionId));
         if (current_subscription_balance < MINIMUM_LINK_AMOUNT) {
             FundSubscription subscriptionFunder = new FundSubscription();
             subscriptionFunder.fundSubscription(
                 networkConfig.vrfCoordinator,
                 networkConfig.subscriptionId,
                 LINK_AMOUNT_TO_FUND,
-                networkConfig.linkTokenContract
+                networkConfig.linkTokenContract,
+                networkConfig.deployerKey
             );
         }
 
@@ -95,7 +98,8 @@ contract DeployRaffle is Script {
         consumerAdder.addConsumer(
             networkConfig.vrfCoordinator,
             networkConfig.subscriptionId,
-            address(raffle)
+            address(raffle),
+            networkConfig.deployerKey
         );
 
         // Return
