@@ -23,7 +23,7 @@
 // view & pure functions
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Raffle} from "../src/Raffle.sol";
@@ -37,8 +37,8 @@ contract DeployRaffle is Script {
     /**
      * @dev external functions
      */
-    function run() external {
-        deployContract();
+    function run() external returns (Raffle, HelperConfig) {
+        return deployContract();
     }
 
     /**
@@ -63,6 +63,13 @@ contract DeployRaffle is Script {
                     networkConfig.deployerAccount
                 );
         }
+        // Set the new value to the state variables in the HelperConfig contract
+        helperConfig.setSubIdForActiveNetworkConfig(
+            networkConfig.subscriptionId
+        );
+        helperConfig.setVrfCoordinatorForActiveNetworkConfig(
+            networkConfig.vrfCoordinator
+        );
 
         // Fund subscription if LINK < 5 ether
         uint256 MINIMUM_LINK_AMOUNT = 300 ether; // 300 LINK

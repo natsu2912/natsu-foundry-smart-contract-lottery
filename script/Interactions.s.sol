@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {HelperConfig, Constants} from "./HelperConfig.s.sol";
@@ -58,11 +58,8 @@ contract CreateSubscription is Script, Constants {
         return (subId, vrfCoordinator);
     }
 
-    function run() external {
-        // Declare constants
-        //uint256 LINK_AMOUNT_TO_FUND = 10 ether;
-        //createAndFundSubscriptionUsingConfig(LINK_AMOUNT_TO_FUND);
-        createSubscriptionUsingHelperConfig();
+    function run() external returns (uint256 subId, address vrfCoordinator) {
+        return createSubscriptionUsingHelperConfig();
     }
 }
 
@@ -157,9 +154,11 @@ contract AddConsumer is Script {
         vm.stopBroadcast();
     }
 
-    function addConsumerUsingConfig(address raffle) internal {
+    function addConsumerUsingConfig(
+        address raffle,
+        HelperConfig helperConfig
+    ) internal {
         // Get network config
-        HelperConfig helperConfig = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = helperConfig
             .getActiveNetworkConfig();
         // Add Raffle contract as Consumer
@@ -171,11 +170,11 @@ contract AddConsumer is Script {
         );
     }
 
-    function run() external {
-        address raffle = DevOpsTools.get_most_recent_deployment(
-            "Raffle",
-            block.chainid
-        );
-        addConsumerUsingConfig(raffle);
+    function run(address raffle, HelperConfig helperConfig) external {
+        //address raffle = DevOpsTools.get_most_recent_deployment(
+        //    "Raffle",
+        //    block.chainid
+        //);
+        addConsumerUsingConfig(raffle, helperConfig);
     }
 }

@@ -24,7 +24,7 @@
 
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.19;
+pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
@@ -67,6 +67,20 @@ contract HelperConfig is Script, Constants {
         return s_activeNetworkConfig;
     }
 
+    function setActiveNetworkConfig(NetworkConfig memory networkConfig) public {
+        s_activeNetworkConfig = networkConfig;
+    }
+
+    function setSubIdForActiveNetworkConfig(uint256 subId) public {
+        s_activeNetworkConfig.subscriptionId = subId;
+    }
+
+    function setVrfCoordinatorForActiveNetworkConfig(
+        address vrfCoordinator
+    ) public {
+        s_activeNetworkConfig.vrfCoordinator = vrfCoordinator;
+    }
+
     function getSepoliaEthConfig()
         internal
         view
@@ -79,8 +93,8 @@ contract HelperConfig is Script, Constants {
                 vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
                 gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
                 //subscriptionId: 70114033652876626055761777853900633248033356250955478684534941029272930067759, // wrong subId, created when testing
-                //subscriptionId: 112508787565041413133707041134491316795283384790279550650135492764536720496235, // correct subId, view on website
-                subscriptionId: 0,
+                subscriptionId: 112508787565041413133707041134491316795283384790279550650135492764536720496235, // correct subId, view on website
+                //subscriptionId: 0, // 0 -> Create a new subscription
                 callbackGasLimit: 500000,
                 linkTokenContract: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
                 deployerAccount: vm.envAddress("SEPOLIA_SENDER_ADDRESS")
@@ -115,7 +129,7 @@ contract HelperConfig is Script, Constants {
                     interval: 30, // 30 seconds
                     vrfCoordinator: address(mockVrfCoordinator), // Local network doesn't have a VRF coordinator
                     gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae, // gasLane value doesn't matter in Local Anvil network
-                    subscriptionId: 0,
+                    subscriptionId: 0, // 0 -> Create a new subscription
                     callbackGasLimit: 500000,
                     linkTokenContract: address(linkToken),
                     deployerAccount: vm.envAddress("LOCAL_SENDER_ADDRESS")

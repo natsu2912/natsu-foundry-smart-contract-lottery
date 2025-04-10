@@ -1,3 +1,8 @@
+AFTER FINISHING THE LESSSION, COMEBACK TO ANSWER THESE QUESTIONS
+
+If still do not know the answer, you should review code from Cyfrin to find answer (maybe still not have answer there, but should try)
+
+
 1. Cannot receive the correct subcription ID when running these commands
     1. Sepolia Eth
         Command
@@ -27,3 +32,11 @@
 3. Remember to finish "Todo"
 
 4. Lessons are using solidify 0.8.19 while we use 0.8.28
+
+5. We are using "skipFork" for 2 functions "testFulfillRandomWordsRevertWhenPerformUpkeepHasNotBeenCalled" and "testFulfillRandomWordsSuccessfulWhenPerformHasBeenCalledAndThenPicksAWinnerAndSendsMoney". Do we have any solution to not skip these functions?
+
+6. There are 4 types of test
+    1. Unit tests - Basic tests that check the functionality
+    2. Integration tests - We test our deployment scripts and other components of our contracts
+    3. Forked tests - Pseudo staging
+    4. Staging tests - We run tests on a mainnet/testnet
