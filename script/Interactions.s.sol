@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {HelperConfig, Constants} from "./HelperConfig.s.sol";
@@ -8,6 +8,7 @@ import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinat
 import {LinkToken} from "test/mocks/LinkToken.sol";
 //import {LinkTokenInterface} from "@chainlink/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IVRFCoordinatorV2Plus} from "@chainlink/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
+import {VRFCoordinatorV2_5} from "@chainlink/src/v0.8/vrf/dev/VRFCoordinatorV2_5.sol";
 import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
 
 contract CreateSubscription is Script, Constants {
@@ -32,7 +33,7 @@ contract CreateSubscription is Script, Constants {
             vm.startBroadcast(deployerAccount); // Only subscription owner (creator) to be DefaultSender when testing
             console.log("msg.sender #1: ", msg.sender);
             console.log("Tx sent from #2: ", tx.origin);
-            subId = IVRFCoordinatorV2Plus(vrfCoordinator).createSubscription();
+            subId = VRFCoordinatorV2_5(vrfCoordinator).createSubscription();
             vm.stopBroadcast();
         }
         console.log("Subscription ID: ", subId);

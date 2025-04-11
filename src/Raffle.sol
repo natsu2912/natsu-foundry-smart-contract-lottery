@@ -25,7 +25,7 @@
 //---------------------------------------------
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.28;
+pragma solidity ^0.8.19;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";

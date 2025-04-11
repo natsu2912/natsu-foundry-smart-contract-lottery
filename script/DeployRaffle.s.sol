@@ -23,7 +23,7 @@
 // view & pure functions
 
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Raffle} from "../src/Raffle.sol";
