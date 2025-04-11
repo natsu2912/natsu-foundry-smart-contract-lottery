@@ -7,8 +7,8 @@ import {VRFCoordinatorV2_5Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinat
 //import {VRFCoordinatorV2Mock} from "@chainlink/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 import {LinkToken} from "test/mocks/LinkToken.sol";
 //import {LinkTokenInterface} from "@chainlink/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
-import {IVRFCoordinatorV2Plus} from "@chainlink/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
-import {VRFCoordinatorV2_5} from "@chainlink/src/v0.8/vrf/dev/VRFCoordinatorV2_5.sol";
+//import {IVRFCoordinatorV2Plus} from "@chainlink/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
+//import {VRFCoordinatorV2_5} from "@chainlink/src/v0.8/vrf/dev/VRFCoordinatorV2_5.sol";
 import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
 
 contract CreateSubscription is Script, Constants {
@@ -28,12 +28,8 @@ contract CreateSubscription is Script, Constants {
             console.log(
                 "[*] Creating a new subcription for chain ETH_SEPOLIA_CHAIN_ID"
             );
-            console.log("msg.sender #1: ", msg.sender);
-            console.log("Tx sent from #1: ", tx.origin);
             vm.startBroadcast(deployerAccount); // Only subscription owner (creator) to be DefaultSender when testing
-            console.log("msg.sender #1: ", msg.sender);
-            console.log("Tx sent from #2: ", tx.origin);
-            subId = VRFCoordinatorV2_5(vrfCoordinator).createSubscription();
+            subId = VRFCoordinatorV2_5Mock(vrfCoordinator).createSubscription();
             vm.stopBroadcast();
         }
         console.log("Subscription ID: ", subId);
